@@ -1,0 +1,1076 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mes Itinéraires</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    @font-face {
+      font-family: 'Always_In_My_Heart';
+      src: url('Always_In_My_Heart.ttf') format('truetype');
+      font-weight: normal;
+      font-style: normal;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body { font-family: 'Segoe UI', sans-serif; overflow: hidden; }
+
+    #map { width: 100vw; height: 100vh; }
+
+    /* ── Menu flottant ── */
+    #menu {
+      position: fixed;
+      bottom: 16px;
+      left: 16px;
+      width: 280px;
+      background: rgba(255,255,255,0.96);
+      border-radius: 10px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      max-height: calc(100vh - 32px);
+    }
+
+    #menu-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 2px 14px;
+      background: #2c5f8a;
+      border-radius: 10px 10px 0 0;
+      color: #fff;
+      cursor: grab;
+      user-select: none;
+    }
+    #menu-header h2 { font-family: "Always_In_My_Heart"; font-size: 36px; font-weight: 100; letter-spacing: 0.5px; }
+    #menu-header .header-icon { height: 20px; width: auto; margin-left: 8px; flex-shrink: 0; position: absolute; left: 135px; }
+    #menu-toggle { font-size: 18px; line-height: 1; }
+
+    #menu-body {
+      overflow-y: auto;
+      padding: 12px 14px;
+    }
+
+    .section-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: #2c5f8a;
+      margin: 10px 0 6px;
+      border-bottom: 1px solid #d0dce8;
+      padding-bottom: 3px;
+    }
+    .section-title:first-child { margin-top: 0; }
+
+    /* Voyageurs */
+    .traveler-row {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .traveler-btn {
+      padding: 4px 12px;
+      border-radius: 20px;
+      border: 2px solid #2c5f8a;
+      background: #fff;
+      color: #2c5f8a;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .traveler-btn.active {
+      background: #2c5f8a;
+      color: #fff;
+    }
+
+    /* Modes */
+    .mode-row {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .mode-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      cursor: pointer;
+      padding: 3px 0;
+    }
+    .mode-label input[type=checkbox] { accent-color: #2c5f8a; width: 14px; height: 14px; }
+
+    /* Voyages */
+    #trip-list {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      max-height: 280px;
+      overflow-y: auto;
+    }
+    .trip-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 2px;
+      border-radius: 4px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+    .trip-item:hover { background: #e8f0f8; }
+    .trip-item input[type=checkbox] { accent-color: #2c5f8a; flex-shrink: 0; }
+    .trip-item .trip-name { flex: 1; }
+    .trip-item .trip-name a { color: #2c5f8a; text-decoration: none; }
+    .trip-item .trip-name a:hover { text-decoration: underline; }
+    .trip-item .trip-date { color: #888; font-size: 11px; white-space: nowrap; }
+    .trip-item .trip-solo {
+      display: none;
+      padding: 1px 5px;
+      font-size: 10px;
+      font-weight: 700;
+      background: #2c5f8a;
+      color: #fff;
+      border-radius: 3px;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+      border: none;
+      line-height: 16px;
+    }
+    .trip-item:hover .trip-solo { display: block; }
+    .trip-item .trip-solo:hover { background: #1a3f5c; }
+
+    /* Boutons select all / none */
+    .select-row {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 6px;
+    }
+    .select-btn {
+      flex: 1;
+      padding: 3px 0;
+      font-size: 11px;
+      background: #e8f0f8;
+      border: 1px solid #b0c8e0;
+      border-radius: 4px;
+      color: #2c5f8a;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .select-btn:hover { background: #c8ddf0; }
+
+    /* Tooltip Leaflet personnalisé */
+    .custom-popup .leaflet-popup-content-wrapper {
+      border-radius: 8px;
+      box-shadow: 0 3px 12px rgba(0,0,0,0.2);
+      padding: 0;
+    }
+    .custom-popup .leaflet-popup-content {
+      margin: 0;
+      min-width: 180px;
+      max-width: 280px;
+    }
+    .popup-title {
+      background: #2c5f8a;
+      color: #fff;
+      padding: 7px 12px;
+      font-size: 13px;
+      font-weight: 700;
+      border-radius: 8px 8px 0 0;
+    }
+    .popup-trips { padding: 8px 12px; }
+    .popup-trip-item {
+      padding: 3px 0;
+      font-size: 12px;
+      border-bottom: 1px solid #eee;
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 8px;
+    }
+    .popup-trip-item:last-child { border-bottom: none; }
+    .popup-trip-name { color: #1a1a1a; font-weight: 500; }
+    .popup-trip-name a { color: #2c5f8a; text-decoration: none; }
+    .popup-trip-name a:hover { text-decoration: underline; }
+    .popup-trip-date { color: #888; font-size: 11px; white-space: nowrap; }
+
+    /* Légende couleurs pays */
+    .country-layer { fill-opacity: 0.45; stroke: #fff; stroke-width: 0.5; }
+
+    #menu.collapsed #menu-body { display: none; }
+    #menu.collapsed { border-radius: 10px; }
+
+    /* Indicateur de chargement */
+    #loading {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(44,95,138,0.92);
+      color: #fff;
+      padding: 8px 18px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      z-index: 2000;
+      display: none;
+      gap: 8px;
+      align-items: center;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+    }
+    #loading.visible { display: flex; }
+    .loading-spinner {
+      width: 12px; height: 12px;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Labels de villes */
+    .city-label {
+      background: transparent;
+      border: none;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+      border-radius: 4px;
+      padding: 1px 6px !important;
+      font-size: 11px;
+      font-weight: 600;
+      color: #fff;
+      white-space: nowrap;
+      pointer-events: auto;
+      cursor: pointer;
+    }
+    .leaflet-tooltip.city-label::before { display: none; }
+  </style>
+</head>
+<body>
+
+<div id="map"></div>
+<div id="loading"><div class="loading-spinner"></div><span>Chargement des pays…</span></div>
+
+<div id="menu">
+  <div id="menu-header">
+    <h2>Itinéraires</h2>
+    <img src="icon.png" class="header-icon" alt="" />
+    <span id="menu-toggle">▲</span>
+  </div>
+  <div id="menu-body">
+
+    <div class="section-title">Voyageur</div>
+    <div class="traveler-row" id="traveler-row"></div>
+
+    <div class="section-title">Affichage</div>
+    <div class="mode-row">
+      <label class="mode-label">
+        <input type="checkbox" id="mode-routes" checked />
+        Trajets
+      </label>
+      <label class="mode-label">
+        <input type="checkbox" id="mode-cities" checked />
+        Villes
+      </label>
+      <label class="mode-label">
+        <input type="checkbox" id="mode-countries" checked />
+        Pays
+      </label>
+    </div>
+
+    <div class="section-title">Voyages</div>
+    <div class="select-row">
+      <button class="select-btn" id="btn-all">Tout sélectionner</button>
+      <button class="select-btn" id="btn-none">Tout désélectionner</button>
+    </div>
+    <div id="trip-list"></div>
+
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-polylinedecorator@1.6.0/dist/leaflet.polylineDecorator.js"></script>
+<script>
+// ─────────────────────────────────────────────
+// INITIALISATION CARTE
+// ─────────────────────────────────────────────
+const map = L.map('map', {
+  center: [30, 15],
+  zoom: 3,
+  zoomControl: true,
+  worldCopyJump: false
+});
+
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+  attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/">CARTO</a>',
+  subdomains: 'abcd',
+  maxZoom: 19
+}).addTo(map);
+
+// ─────────────────────────────────────────────
+// ÉTAT
+// ─────────────────────────────────────────────
+let trips = [];
+let coords = {};
+let selectedTraveler = 'PM';
+let selectedTrips = new Set();
+let modes = { routes: true, cities: true, countries: true };
+
+// Layers Leaflet (ordre : countries en dessous, puis routes, puis cities)
+let countryLayer = L.layerGroup().addTo(map);
+let routeLayer = L.layerGroup().addTo(map);
+let cityLayer = L.layerGroup().addTo(map);
+
+// GeoJSON des pays (chargé en lazy)
+let worldGeoJSON = null;
+let renderVersion = 0; // pour annuler les rendus asynchrones périmés
+
+const LABEL_MIN_ZOOM = 5; // zoom minimum pour afficher les labels
+const LABEL_PADDING  = 4; // pixels de marge anti-overlap
+
+const MONTHS_FR = ['Jan','Fév','Mar','Avr','Mai','Juin','Juil','Août','Sep','Oct','Nov','Déc'];
+
+// Palette de couleurs par voyageur (pour les trajets)
+const TRAVELER_COLORS = {
+  'PM': '#e05c2a',
+  'V': '#7e3abf',
+  'May': '#2a9d8f',
+  'default': '#2c5f8a'
+};
+
+// ─────────────────────────────────────────────
+// CHARGEMENT DES DONNÉES
+// ─────────────────────────────────────────────
+async function loadData() {
+  const [tripsRes, coordsRes] = await Promise.all([
+    fetch('data/trips.json'),
+    fetch('data/coords.json')
+  ]);
+  trips = await tripsRes.json();
+  coords = await coordsRes.json();
+
+  // Tri chronologique
+  trips.sort((a, b) => a.annee !== b.annee ? b.annee - a.annee : b.mois - a.mois);
+
+  initMenu();
+  render();
+}
+
+// ─────────────────────────────────────────────
+// MENU
+// ─────────────────────────────────────────────
+function initMenu() {
+  // Voyageurs (extraits depuis les données)
+  const allTravelers = ['PM', 'V', 'May'];
+  const travelerRow = document.getElementById('traveler-row');
+  allTravelers.forEach(t => {
+    const btn = document.createElement('button');
+    btn.className = 'traveler-btn' + (t === selectedTraveler ? ' active' : '');
+    btn.textContent = t;
+    btn.addEventListener('click', () => {
+      selectedTraveler = t;
+      travelerRow.querySelectorAll('.traveler-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      selectAllTripsForTraveler();
+      buildTripList();
+      render();
+    });
+    travelerRow.appendChild(btn);
+  });
+
+  // Sélection initiale
+  selectAllTripsForTraveler();
+  buildTripList();
+
+  // Modes
+  ['routes','cities','countries'].forEach(m => {
+    document.getElementById('mode-'+m).addEventListener('change', e => {
+      modes[m] = e.target.checked;
+      render();
+    });
+  });
+
+  // Select all / none
+  document.getElementById('btn-all').addEventListener('click', () => {
+    const filtered = getFilteredTrips();
+    filtered.forEach(t => selectedTrips.add(tripKey(t)));
+    buildTripList();
+    render();
+  });
+  document.getElementById('btn-none').addEventListener('click', () => {
+    selectedTrips.clear();
+    buildTripList();
+    render();
+  });
+
+  // Toggle menu (seulement si pas de drag)
+  let wasDragged = false;
+  document.getElementById('menu-header').addEventListener('click', () => {
+    if (wasDragged) { wasDragged = false; return; }
+    document.getElementById('menu').classList.toggle('collapsed');
+    document.getElementById('menu-toggle').textContent =
+      document.getElementById('menu').classList.contains('collapsed') ? '▼' : '▲';
+  });
+
+  // Drag & drop du menu
+  const menuEl = document.getElementById('menu');
+  const headerEl = document.getElementById('menu-header');
+  let dragStartX, dragStartY, menuStartX, menuStartY;
+
+  headerEl.addEventListener('mousedown', e => {
+    // Initialiser la position absolue si ce n'est pas encore fait
+    const rect = menuEl.getBoundingClientRect();
+    menuEl.style.bottom = 'auto';
+    menuEl.style.right  = 'auto';
+    menuEl.style.left = rect.left + 'px';
+    menuEl.style.top  = rect.top  + 'px';
+
+    dragStartX = e.clientX;
+    dragStartY = e.clientY;
+    menuStartX = rect.left;
+    menuStartY = rect.top;
+    wasDragged = false;
+
+    headerEl.style.cursor = 'grabbing';
+
+    function onMouseMove(e) {
+      const dx = e.clientX - dragStartX;
+      const dy = e.clientY - dragStartY;
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) wasDragged = true;
+      // Contraindre dans la fenêtre
+      const maxX = window.innerWidth  - menuEl.offsetWidth;
+      const maxY = window.innerHeight - menuEl.offsetHeight;
+      menuEl.style.left = Math.max(0, Math.min(maxX, menuStartX + dx)) + 'px';
+      menuEl.style.top  = Math.max(0, Math.min(maxY, menuStartY + dy)) + 'px';
+    }
+
+    function onMouseUp() {
+      headerEl.style.cursor = 'grab';
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    }
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  });
+}
+
+function tripKey(t) {
+  return t.nom + '|' + t.annee + '|' + t.mois;
+}
+
+function getFilteredTrips() {
+  return trips.filter(t => t.voyageurs && t.voyageurs.includes(selectedTraveler));
+}
+
+function selectAllTripsForTraveler() {
+  selectedTrips.clear();
+  getFilteredTrips().forEach(t => selectedTrips.add(tripKey(t)));
+}
+
+function buildTripList() {
+  const list = document.getElementById('trip-list');
+  list.innerHTML = '';
+  const filtered = getFilteredTrips();
+
+  filtered.forEach(t => {
+    const key = tripKey(t);
+    const item = document.createElement('div');
+    item.className = 'trip-item';
+
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = selectedTrips.has(key);
+    cb.addEventListener('change', () => {
+      if (cb.checked) selectedTrips.add(key);
+      else selectedTrips.delete(key);
+      render();
+    });
+
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'trip-name';
+    if (t.link) {
+      const a = document.createElement('a');
+      a.href = t.link;
+      a.target = '_blank';
+      a.textContent = t.nom;
+      a.addEventListener('click', e => e.stopPropagation());
+      nameSpan.appendChild(a);
+    } else {
+      nameSpan.textContent = t.nom;
+    }
+
+    const dateSpan = document.createElement('span');
+    dateSpan.className = 'trip-date';
+    dateSpan.textContent = MONTHS_FR[(t.mois - 1)] + ' ' + t.annee;
+
+    // Bouton "isoler" au hover
+    const soloBtn = document.createElement('button');
+    soloBtn.className = 'trip-solo';
+    soloBtn.textContent = 'seul';
+    soloBtn.title = 'Afficher uniquement ce voyage';
+    soloBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      selectedTrips.clear();
+      selectedTrips.add(key);
+      buildTripList();
+      render();
+    });
+
+    item.appendChild(cb);
+    item.appendChild(nameSpan);
+    item.appendChild(soloBtn);
+    item.appendChild(dateSpan);
+
+
+    // Clic sur l'item (hors checkbox) toggle la checkbox
+    item.addEventListener('click', e => {
+      if (e.target !== cb) {
+        cb.checked = !cb.checked;
+        if (cb.checked) selectedTrips.add(key);
+        else selectedTrips.delete(key);
+        render();
+      }
+    });
+
+    list.appendChild(item);
+  });
+}
+
+// ─────────────────────────────────────────────
+// RENDU
+// ─────────────────────────────────────────────
+function getActiveTrips() {
+  return getFilteredTrips().filter(t => selectedTrips.has(tripKey(t)));
+}
+
+function render() {
+  renderVersion++;
+  const myVersion = renderVersion;
+
+  routeLayer.clearLayers();
+  cityLayer.clearLayers();
+  countryLayer.clearLayers();
+
+  const active = getActiveTrips();
+  if (active.length === 0) return;
+
+  const color = TRAVELER_COLORS[selectedTraveler] || TRAVELER_COLORS['default'];
+
+  // ── PAYS ──
+  if (modes.countries) {
+    renderCountries(active, color, myVersion);
+  }
+
+  // ── TRAJETS ──
+  if (modes.routes) {
+    active.forEach(trip => {
+      const pts = trip.villes
+        .map(v => coords[v])
+        .filter(Boolean)
+        .map(c => [c[0], c[1]]);
+
+      if (pts.length < 2) return;
+
+      // Dédoublonner les points consécutifs identiques
+      const deduped = [pts[0]];
+      for (let i = 1; i < pts.length; i++) {
+        if (pts[i][0] !== deduped[deduped.length-1][0] || pts[i][1] !== deduped[deduped.length-1][1]) {
+          deduped.push(pts[i]);
+        }
+      }
+      if (deduped.length < 2) return;
+
+      const polyline = L.polyline(deduped, {
+        color: color,
+        weight: 2.5,
+        opacity: 0.75,
+        smoothFactor: 1
+      });
+
+      const decorator = L.polylineDecorator(polyline, {
+        patterns: [{
+          offset: '50%',
+          repeat: 0,
+          symbol: L.Symbol.arrowHead({
+            pixelSize: 10,
+            pathOptions: {
+              color: color,
+              fillColor: color,
+              fillOpacity: 1,
+              opacity: 0.85,
+              weight: 1
+            }
+          })
+        }]
+      });
+
+      polyline.on('click', () => showTripPopup(trip, deduped[0]));
+      routeLayer.addLayer(polyline);
+      routeLayer.addLayer(decorator);
+    });
+  }
+
+  // ── VILLES ──
+  if (modes.cities) {
+    // Regrouper les voyages par ville
+    const cityMap = {}; // ville -> [trip, ...]
+    active.forEach(trip => {
+      const seen = new Set();
+      trip.villes.forEach(v => {
+        if (!seen.has(v) && coords[v]) {
+          seen.add(v);
+          if (!cityMap[v]) cityMap[v] = [];
+          cityMap[v].push(trip);
+        }
+      });
+    });
+
+    Object.entries(cityMap).forEach(([city, cityTrips]) => {
+      const c = coords[city];
+      const marker = L.circleMarker([c[0], c[1]], {
+        radius: 5,
+        color: '#fff',
+        weight: 2,
+        fillColor: color,
+        fillOpacity: 0.9,
+        bubblingMouseEvents: false
+      });
+
+      marker.on('click', () => {
+        const content = buildCityPopup(city, cityTrips);
+        L.popup({ className: 'custom-popup' })
+          .setLatLng([c[0], c[1]])
+          .setContent(content)
+          .openOn(map);
+      });
+
+      // Label permanent
+      marker.bindTooltip(city, {
+        permanent: true,
+        direction: 'right',
+        offset: [6, 0],
+        className: 'city-label',
+        opacity: 1
+      });
+
+      cityLayer.addLayer(marker);
+    });
+
+    // Afficher/masquer les labels selon zoom et overlaps
+    updateCityLabels();
+  }
+}
+
+// Recalcule la visibilité des labels (zoom + overlap)
+function updateCityLabels() {
+  const zoom = map.getZoom();
+  const shown = [];
+  const color = TRAVELER_COLORS[selectedTraveler] || TRAVELER_COLORS['default'];
+
+  cityLayer.eachLayer(marker => {
+    if (!marker.getTooltip) return;
+    const tooltip = marker.getTooltip();
+    if (!tooltip) return;
+
+    if (zoom < LABEL_MIN_ZOOM) {
+      marker.closeTooltip();
+      return;
+    }
+
+    // Position en pixels du marker
+    const pos = map.latLngToContainerPoint(marker.getLatLng());
+    // Estimation de la taille du label (approx. 7px par caractère)
+    const text = tooltip.getContent();
+    const w = text.length * 7;
+    const h = 14;
+    const x1 = pos.x + 6 - LABEL_PADDING;
+    const y1 = pos.y - h / 2 - LABEL_PADDING;
+    const x2 = x1 + w + LABEL_PADDING * 2;
+    const y2 = y1 + h + LABEL_PADDING * 2;
+
+    // Vérifier l'overlap avec les labels déjà affichés
+    const overlaps = shown.some(r =>
+      x1 < r.x2 && x2 > r.x1 && y1 < r.y2 && y2 > r.y1
+    );
+
+    if (overlaps) {
+      marker.closeTooltip();
+    } else {
+      marker.openTooltip();
+      const el = tooltip.getElement();
+      if (el) {
+        el.style.backgroundColor = color;
+        el.addEventListener('click', e => {
+          e.stopPropagation();
+          marker.fire('click');
+        });
+      }
+      shown.push({ x1, y1, x2, y2 });
+    }
+  });
+}
+
+const GEOJSON_URL = 'https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_50m_admin_0_countries.geojson';
+const GEOJSON_CACHE_KEY = 'ne_50m_countries_v1';
+
+async function loadWorldGeoJSON() {
+  // 1. Essai depuis le cache localStorage
+  try {
+    const cached = localStorage.getItem(GEOJSON_CACHE_KEY);
+    if (cached) {
+      return JSON.parse(cached);
+    }
+  } catch(e) { /* localStorage indisponible ou quota dépassé */ }
+
+  // 2. Téléchargement avec indicateur de chargement
+  const loadingEl = document.getElementById('loading');
+  loadingEl.classList.add('visible');
+  try {
+    const res = await fetch(GEOJSON_URL);
+    const data = await res.json();
+    // Mise en cache pour les prochaines visites
+    try { localStorage.setItem(GEOJSON_CACHE_KEY, JSON.stringify(data)); } catch(e) {}
+    return data;
+  } finally {
+    loadingEl.classList.remove('visible');
+  }
+}
+
+// ─────────────────────────────────────────────
+// PAYS
+// ─────────────────────────────────────────────
+async function renderCountries(active, color, myVersion) {
+  if (!worldGeoJSON) {
+    try {
+      worldGeoJSON = await loadWorldGeoJSON();
+    } catch(e) {
+      console.warn('Impossible de charger le GeoJSON des pays', e);
+      document.getElementById('loading').classList.remove('visible');
+      return;
+    }
+  }
+
+  // Si un nouveau rendu a été lancé depuis, on abandonne
+  if (myVersion !== renderVersion) return;
+
+  // Construire un mapping pays -> voyages
+  const countryTripsMap = {};
+  active.forEach(trip => {
+    trip.pays.forEach(p => {
+      if (!countryTripsMap[p]) countryTripsMap[p] = [];
+      countryTripsMap[p].push(trip);
+    });
+  });
+
+  const visitedNames = new Set(Object.keys(countryTripsMap));
+
+  // Territoires d'outre-mer / territoires non représentés dans le GeoJSON monde
+  // → on les représente via des cercles colorés sur la carte
+  const OVERSEAS = {
+    'Guadeloupe': { latlng: [16.25, -61.58], label: 'Guadeloupe' },
+    'Martinique':  { latlng: [14.64, -61.01], label: 'Martinique' },
+  };
+  Object.entries(OVERSEAS).forEach(([name, info]) => {
+    if (!countryTripsMap[name]) return;
+    const tripList = countryTripsMap[name];
+    const circle = L.circle(info.latlng, {
+      radius: 60000,
+      fillColor: color,
+      fillOpacity: 0.5,
+      color: color,
+      weight: 2,
+      opacity: 0.8
+    });
+    circle.on('click', e => {
+      const content = buildCountryPopup(countryFr(info.label), tripList);
+      L.popup({ className: 'custom-popup' })
+        .setLatLng(e.latlng)
+        .setContent(content)
+        .openOn(map);
+    });
+    circle.on('mouseover', () => circle.setStyle({ fillOpacity: 0.75 }));
+    circle.on('mouseout', () => circle.setStyle({ fillOpacity: 0.5 }));
+    countryLayer.addLayer(circle);
+    // Supprimer pour ne pas dupliquer dans le popup "France"
+    delete countryTripsMap[name];
+    visitedNames.delete(name);
+  });
+
+  // Correspondances entre noms dans nos données et noms Natural Earth (ADMIN ou NAME)
+  const OURS_TO_NE = {
+    'Czech Republic':           ['Czechia', 'Czech Republic'],
+    'Republic of Serbia':       ['Serbia'],
+    'Macedonia':                ['North Macedonia'],
+    'Bosnia and Herzegovina':   ['Bosnia and Herz.'],
+    'South Korea':              ['South Korea'],
+    'United States of America': ['United States of America'],
+    'United Kingdom':           ['United Kingdom'],
+    'Russia':                   ['Russia'],
+    'Iran':                     ['Iran'],
+    'Myanmar':                  ['Myanmar'],
+    'Oman':                     ['Oman'],
+  };
+
+  // Exclure la France (on ne veut afficher que les pays étrangers)
+  delete countryTripsMap['France'];
+  visitedNames.delete('France');
+
+  // Index inversé NE -> nos données (pour lookup rapide)
+  const neToOurs = {}; // nom NE -> [noms dans countryTripsMap]
+  visitedNames.forEach(ourName => {
+    const neNames = OURS_TO_NE[ourName] || [ourName];
+    neNames.forEach(ne => {
+      if (!neToOurs[ne]) neToOurs[ne] = [];
+      neToOurs[ne].push(ourName);
+    });
+  });
+
+  function getOurNames(feature) {
+    const candidates = [
+      feature.properties.ADMIN,
+      feature.properties.NAME,
+      feature.properties.name,
+    ].filter(Boolean);
+    for (const c of candidates) {
+      if (neToOurs[c]) return neToOurs[c];
+    }
+    return null;
+  }
+
+  const geoLayer = L.geoJSON(worldGeoJSON, {
+    style: feature => {
+      const ourNames = getOurNames(feature);
+      if (ourNames) {
+        return {
+          fillColor: color,
+          fillOpacity: 0.35,
+          color: color,
+          weight: 1,
+          opacity: 0.6
+        };
+      }
+      return { fillColor: 'transparent', fillOpacity: 0, color: 'transparent', weight: 0 };
+    },
+    onEachFeature: (feature, layer) => {
+      const ourNames = getOurNames(feature);
+      if (!ourNames) return;
+      // Agréger tous les voyages de tous les pays correspondants
+      const allTrips = [];
+      const seen = new Set();
+      ourNames.forEach(ourName => {
+        (countryTripsMap[ourName] || []).forEach(t => {
+          const k = tripKey(t);
+          if (!seen.has(k)) { seen.add(k); allTrips.push(t); }
+        });
+      });
+      if (allTrips.length === 0) return;
+
+      // Nom d'affichage = le nom NE (ADMIN de préférence)
+      const displayName = countryFr(feature.properties.ADMIN || feature.properties.NAME || ourNames[0]);
+
+      layer.on('click', e => {
+        const content = buildCountryPopup(displayName, allTrips);
+        L.popup({ className: 'custom-popup' })
+          .setLatLng(e.latlng)
+          .setContent(content)
+          .openOn(map);
+      });
+
+      layer.on('mouseover', () => {
+        layer.setStyle({ fillOpacity: 0.6, weight: 2 });
+      });
+      layer.on('mouseout', () => {
+        layer.setStyle({ fillOpacity: 0.35, weight: 1 });
+      });
+    }
+  });
+
+  countryLayer.addLayer(geoLayer);
+}
+
+// ─────────────────────────────────────────────
+// TRADUCTION DES NOMS DE PAYS
+// ─────────────────────────────────────────────
+const COUNTRY_FR = {
+  'Afghanistan': 'Afghanistan',
+  'Albania': 'Albanie',
+  'Algeria': 'Algérie',
+  'Andorra': 'Andorre',
+  'Angola': 'Angola',
+  'Argentina': 'Argentine',
+  'Armenia': 'Arménie',
+  'Australia': 'Australie',
+  'Austria': 'Autriche',
+  'Azerbaijan': 'Azerbaïdjan',
+  'Bahrain': 'Bahreïn',
+  'Bangladesh': 'Bangladesh',
+  'Belarus': 'Biélorussie',
+  'Belgium': 'Belgique',
+  'Bolivia': 'Bolivie',
+  'Bosnia and Herz.': 'Bosnie-Herzégovine',
+  'Bosnia and Herzegovina': 'Bosnie-Herzégovine',
+  'Brazil': 'Brésil',
+  'Bulgaria': 'Bulgarie',
+  'Cambodia': 'Cambodge',
+  'Canada': 'Canada',
+  'Chile': 'Chili',
+  'China': 'Chine',
+  'Colombia': 'Colombie',
+  'Croatia': 'Croatie',
+  'Cuba': 'Cuba',
+  'Cyprus': 'Chypre',
+  'Czechia': 'Tchéquie',
+  'Czech Republic': 'Tchéquie',
+  'Denmark': 'Danemark',
+  'Ecuador': 'Équateur',
+  'Egypt': 'Égypte',
+  'Estonia': 'Estonie',
+  'Ethiopia': 'Éthiopie',
+  'Finland': 'Finlande',
+  'France': 'France',
+  'Georgia': 'Géorgie',
+  'Germany': 'Allemagne',
+  'Greece': 'Grèce',
+  'Guadeloupe': 'Guadeloupe',
+  'Hungary': 'Hongrie',
+  'Iceland': 'Islande',
+  'India': 'Inde',
+  'Indonesia': 'Indonésie',
+  'Iran': 'Iran',
+  'Iraq': 'Irak',
+  'Ireland': 'Irlande',
+  'Israel': 'Israël',
+  'Italy': 'Italie',
+  'Japan': 'Japon',
+  'Jordan': 'Jordanie',
+  'Kazakhstan': 'Kazakhstan',
+  'Kosovo': 'Kosovo',
+  'Latvia': 'Lettonie',
+  'Liechtenstein': 'Liechtenstein',
+  'Lithuania': 'Lituanie',
+  'Luxembourg': 'Luxembourg',
+  'Macedonia': 'Macédoine du Nord',
+  'North Macedonia': 'Macédoine du Nord',
+  'Malaysia': 'Malaisie',
+  'Martinique': 'Martinique',
+  'Mexico': 'Mexique',
+  'Moldova': 'Moldavie',
+  'Monaco': 'Monaco',
+  'Montenegro': 'Monténégro',
+  'Morocco': 'Maroc',
+  'Myanmar': 'Birmanie',
+  'Netherlands': 'Pays-Bas',
+  'New Zealand': 'Nouvelle-Zélande',
+  'Norway': 'Norvège',
+  'Oman': 'Oman',
+  'Pakistan': 'Pakistan',
+  'Peru': 'Pérou',
+  'Philippines': 'Philippines',
+  'Poland': 'Pologne',
+  'Portugal': 'Portugal',
+  'Romania': 'Roumanie',
+  'Russia': 'Russie',
+  'Saudi Arabia': 'Arabie saoudite',
+  'Serbia': 'Serbie',
+  'Republic of Serbia': 'Serbie',
+  'Singapore': 'Singapour',
+  'Slovakia': 'Slovaquie',
+  'Slovenia': 'Slovénie',
+  'South Korea': 'Corée du Sud',
+  'Spain': 'Espagne',
+  'Sweden': 'Suède',
+  'Switzerland': 'Suisse',
+  'Thailand': 'Thaïlande',
+  'Tunisia': 'Tunisie',
+  'Turkey': 'Turquie',
+  'Ukraine': 'Ukraine',
+  'United Arab Emirates': 'Émirats arabes unis',
+  'United Kingdom': 'Royaume-Uni',
+  'United States of America': 'États-Unis',
+  'Uzbekistan': 'Ouzbékistan',
+  'Vatican': 'Vatican',
+  'Venezuela': 'Venezuela',
+  'Vietnam': 'Viêt Nam',
+};
+
+function countryFr(name) {
+  return COUNTRY_FR[name] || name;
+}
+
+// ─────────────────────────────────────────────
+// POPUPS
+// ─────────────────────────────────────────────
+function formatTripDate(trip) {
+  return MONTHS_FR[(trip.mois - 1)] + ' ' + trip.annee;
+}
+
+function tripNameHtml(trip) {
+  if (trip.link) {
+    return `<a href="${trip.link}" target="_blank">${trip.nom}</a>`;
+  }
+  return trip.nom;
+}
+
+function buildCityPopup(city, cityTrips) {
+  let html = `<div class="popup-title">📍 ${city}</div><div class="popup-trips">`;
+  cityTrips.forEach(t => {
+    html += `<div class="popup-trip-item">
+      <span class="popup-trip-name">${tripNameHtml(t)}</span>
+      <span class="popup-trip-date">${formatTripDate(t)}</span>
+    </div>`;
+  });
+  html += '</div>';
+  return html;
+}
+
+function buildCountryPopup(country, tripList) {
+  let html = `<div class="popup-title">🌍 ${country}</div><div class="popup-trips">`;
+  tripList.forEach(t => {
+    html += `<div class="popup-trip-item">
+      <span class="popup-trip-name">${tripNameHtml(t)}</span>
+      <span class="popup-trip-date">${formatTripDate(t)}</span>
+    </div>`;
+  });
+  html += '</div>';
+  return html;
+}
+
+function showTripPopup(trip, latlng) {
+  const content = `<div class="popup-title">🧭 ${trip.nom}</div>
+    <div class="popup-trips">
+      <div class="popup-trip-item">
+        <span class="popup-trip-name">${trip.link ? `<a href="${trip.link}" target="_blank">Voir le récit ↗</a>` : trip.nom}</span>
+        <span class="popup-trip-date">${formatTripDate(trip)}</span>
+      </div>
+      <div class="popup-trip-item" style="font-size:11px;color:#666;border:none">
+        ${trip.villes.join(' → ')}
+      </div>
+    </div>`;
+  L.popup({ className: 'custom-popup' })
+    .setLatLng(latlng)
+    .setContent(content)
+    .openOn(map);
+}
+
+// ─────────────────────────────────────────────
+// DÉMARRAGE
+// ─────────────────────────────────────────────
+map.on('zoomend moveend', () => {
+  if (modes.cities) updateCityLabels();
+});
+
+loadData();
+</script>
+</body>
+</html>
+
+
+
+
+
+
+
