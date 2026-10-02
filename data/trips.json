@@ -699,8 +699,8 @@
     "nom": "Pays Basque",
     "mois": 8,
     "annee": 2019,
-    "villes": ["San Sebastian"],
-    "pays": ["Spain"],
+    "villes": ["Biarritz", "Bayonne", "San Sebastian"],
+    "pays": ["France", "Spain"],
     "voyageurs": ["V", "May"]
   }, {
     "nom": "Petite Pologne",
@@ -823,7 +823,7 @@
     "mois": 9,
     "annee": 2026,
     "villes": ["Toulon", "Alghero", "Cagliari", "Carbonia", "Tuerredda", "Cagliari"],
-    "pays": ["Egypt"],
+    "pays": ["France", "Italy"],
     "voyageurs": ["PM", "V", "May"]
   },
 
