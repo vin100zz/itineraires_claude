@@ -818,6 +818,14 @@
     "pays": ["Egypt"],
     "voyageurs": ["PM", "V", "May"]
   },
+  {
+    "nom": "Sardaigne",
+    "mois": 9,
+    "annee": 2026,
+    "villes": ["Toulon", "Alghero", "Cagliari", "Carbonia", "Tuerredda", "Cagliari"],
+    "pays": ["Egypt"],
+    "voyageurs": ["PM", "V", "May"]
+  },
 
 
   {
